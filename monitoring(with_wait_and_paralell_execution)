@@ -1,0 +1,174 @@
+{
+   "StartAt":"Old monitoring snapshots cleanup",
+   "States":{
+      "Old monitoring snapshots cleanup":{
+         "Type":"Task",
+         "Resource":"arn:aws:states:::lambda:invoke",
+         "Parameters":{
+            "FunctionName":"arn:aws:lambda:eu-:function:grafana_prom_viktoriametrics_snap_cleanup:$LATEST",
+            "Payload":{
+               "Input.$":"$"
+            }
+         },
+         "Next":"process-snapshots-creation"
+      },
+      "process-snapshots-creation":{
+         "Type":"Parallel",
+         "Branches":[
+            {
+               "StartAt":"Create viktoriametrics snapshot",
+               "States":{
+                  "Create viktoriametrics snapshot":{
+                     "Type":"Task",
+                     "Resource":"arn:aws:states:::lambda:invoke",
+                     "Parameters":{
+                        "FunctionName":"arn:aws:lambda:eu-:function:snap_create_monitoring_viktoriametrics:$LATEST",
+                        "Payload":{
+                           "Input.$":"$"
+                        }
+                     },
+                     "Next":"Create viktoriametrics snapshot-wait"
+                  },
+                  "Create viktoriametrics snapshot-wait":{
+                     "Type":"Wait",
+                     "Seconds":300,
+                     "Next":"Create viktoriametrics snapshot-status"
+                  },
+                  "Create viktoriametrics snapshot-status":{
+                     "Type":"Task",
+                     "Resource":"arn:aws:states:::lambda:invoke",
+                     "Parameters":{
+                        "FunctionName":"arn:aws:lambda:eu-:function:checkifcreated_snap_monitoring_viktoriametrics",
+                        "Payload":{
+                           "Input.$":"$"
+                        }
+                     },
+                     "Next":"Copy snap viktoriametrics"
+                  },
+                  "Copy snap viktoriametrics":{
+                     "Type":"Task",
+                     "Resource":"arn:aws:states:::lambda:invoke",
+                     "Parameters":{
+                        "FunctionName":"arn:aws:lambda:eu-:function:copy_snap_viktoriametrics:$LATEST",
+                        "Payload":{
+                           "Input.$":"$"
+                        }
+                     },
+                     "Next":"Check if copied viktoriametrics"
+                  },
+                  "Check if copied viktoriametrics":{
+                     "Type":"Task",
+                     "Resource":"arn:aws:states:::lambda:invoke",
+                     "Parameters":{
+                        "FunctionName":"arn:aws:lambda:eu-:function:check_ifcopied_viktoriametrics:$LATEST",
+                        "Payload":{
+                           "Input.$":"$"
+                        }
+                     },
+                     "Next":"Copy viktoriametrics snapshot-complete"
+                  },
+                  "Wait 60 seconds":{
+                     "Type":"Wait",
+                     "Seconds":60,
+                     "Next":"Check if copied viktoriametrics"
+                  },
+                  "Copy viktoriametrics snapshot-complete":{
+                     "Type":"Choice",
+                     "Choices":[
+                        {
+                           "Variable":"$.Payload.state",
+                           "StringEquals":"completed",
+                           "Next":"success_viktoria"
+                        }
+                     ],
+                     "Default":"Wait 60 seconds"
+                  },
+                  "success_viktoria":{
+                     "Type":"Pass",
+                     "End":true
+                  }
+               }
+            },
+            {
+               "StartAt":"Create grafana - prom snapshot",
+               "States":{
+                  "Create grafana - prom snapshot":{
+                     "Type":"Task",
+                     "Resource":"arn:aws:states:::lambda:invoke",
+                     "Parameters":{
+                        "FunctionName":"arn:aws:lambda:eu-:function:snap_create_monitoring_prom_grafana:$LATEST",
+                        "Payload":{
+                           "Input.$":"$"
+                        }
+                     },
+                     "Next":"Create grafana-prom-wait"
+                  },
+                  "Create grafana-prom-wait":{
+                     "Type":"Wait",
+                     "Seconds":330,
+                     "Next":"Create grafana-prom-status"
+                  },
+                  "Create grafana-prom-status":{
+                     "Type":"Task",
+                     "Resource":"arn:aws:states:::lambda:invoke",
+                     "Parameters":{
+                        "FunctionName":"arn:aws:lambda:eu-:function:checkifcreated_snap_monitoring_grafana_prom",
+                        "Payload":{
+                           "Input.$":"$"
+                        }
+                     },
+                     "Next":"Copy grafana-prom snapshot"
+                  },
+                  "Copy grafana-prom snapshot":{
+                     "Type":"Task",
+                     "Resource":"arn:aws:states:::lambda:invoke",
+                     "Parameters":{
+                        "FunctionName":"arn:aws:lambda:eu-:function:copy_snap_prom_grafana:$LATEST",
+                        "Payload":{
+                           "Input.$":"$"
+                        }
+                     },
+                     "Next":"Check if copied grafana-prom snapshot"
+                  },
+                  "Check if copied grafana-prom snapshot":{
+                     "Type":"Task",
+                     "Resource":"arn:aws:states:::lambda:invoke",
+                     "Parameters":{
+                        "FunctionName":"arn:aws:lambda:eu-:function:check_ifcopied_prom_grafana_snap:$LATEST",
+                        "Payload":{
+                           "Input.$":"$"
+                        }
+                     },
+                     "Next":"Copy grafana-prom snapshot-complete"
+                  },
+                  "Wait 65 seconds":{
+                     "Type":"Wait",
+                     "Seconds":65,
+                     "Next":"Check if copied grafana-prom snapshot"
+                  },
+                  "Copy grafana-prom snapshot-complete":{
+                     "Type":"Choice",
+                     "Choices":[
+                        {
+                           "Variable":"$.Payload.state",
+                           "StringEquals":"completed",
+                           "Next":"success_prom_grafana"
+                        }
+                     ],
+                     "Default":"Wait 65 seconds"
+                  },
+                  "success_prom_grafana":{
+                     "Type":"Pass",
+                     "End":true
+                  }
+               }
+            }
+         ],
+         "Next":"Final_check"
+      },
+      "Final_check":{
+         "Type":"Pass",
+         "End":true
+      }
+   }
+}
